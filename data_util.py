@@ -1,16 +1,10 @@
 import numpy as np
 
 
-def load_glove(voc_file, glove_filename, voc_size):
-    word_to_id = {}
+def load_glove(preprocesser, glove_filename):
     word_to_embedding = {}
 
-    vocab_dict = open(voc_file, encoding='utf-8').readlines()
-    for line in vocab_dict[:voc_size]:
-        word, word_id = line.split()
-        word_to_id[word] = word_id
-
-    with open(glove_filename, 'r') as glove_file:
+    with open(glove_filename, 'r', encoding='utf-8') as glove_file:
         for (i, line) in enumerate(glove_file):
             split = line.split(' ')
 
@@ -18,6 +12,6 @@ def load_glove(voc_file, glove_filename, voc_size):
             embedding = split[1:]
             embedding = np.array([float(val) for val in embedding])
             
-            if word in word_to_id.keys():
-                word_to_embedding[int(word_to_id[word])] = embedding
+            if preprocesser.get_id(word) != '[UNL]':
+                word_to_embedding[preprocesser.get_id(word)] = embedding
     return word_to_embedding

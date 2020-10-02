@@ -67,25 +67,24 @@ class BiDAF:
         cinn = tf.keras.layers.Input(shape=(self.clen,), name='context_input')
         qinn = tf.keras.layers.Input(shape=(self.qlen,), name='question_input')
 
-        word_embedding_matrix = load_glove('./data/vocab.txt', './data/glove.6B.300d.txt', self.max_features)
+        word_embedding_matrix = load_glove(ds, './data/glove.6B.300d.txt')
 
         word_embedding_layer = tf.keras.layers.Embedding(self.max_features,
                                                          300,
                                                          weights=[word_embedding_matrix],
                                                          trainable=False)
 
-        c_char_embedding_layer = tf.keras.layers.Conv1D(100,
-                                                      5,
-                                                      activation='tanh',
-                                                      trainable=True)(cinn[None, :])
-        
-        q_char_embedding_layer = tf.keras.layers.Conv1D(100,
-                                                      5,
-                                                      activation='tanh',
-                                                      trainable=True)(qinn[None, :])
+        cnn_layer = tf.keras.layers.Conv1D(300,
+                                           5,
+                                           activation='tanh',
+                                           trainable=True)
 
-        cemb = tf.keras.layers.Concatenate(axis=1)([c_char_embedding_layer, word_embedding_layer])
-        qemb = tf.keras.layers.Concatenate(axis=1)([q_char_embedding_layer, word_embedding_layer])
+        c_char_embedding_layer = cnn_layer(cinn[None, :])
+        
+        q_char_embedding_layer = cnn_layer(qinn[None, :])
+
+        cemb = tf.keras.layers.Concatenate(axis=-1)([c_char_embedding_layer, word_embedding_layer])
+        qemb = tf.keras.layers.Concatenate(axis=-1)([q_char_embedding_layer, word_embedding_layer])
 
         for i in range(self.num_highway_layers):
             """
