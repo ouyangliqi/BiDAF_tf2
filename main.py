@@ -74,17 +74,28 @@ class BiDAF:
                                                          weights=[word_embedding_matrix],
                                                          trainable=False)
 
-        cnn_layer = tf.keras.layers.Conv1D(300,
-                                           5,
-                                           activation='tanh',
-                                           trainable=True)
+        c_cnn_layer = tf.keras.layers.Conv1D(300,
+                                             5,
+                                             activation='tanh',
+                                             input_shape=(None, self.clen, None),
+                                             trainable=True)
 
-        c_char_embedding_layer = cnn_layer(cinn[None, :])
-        
-        q_char_embedding_layer = cnn_layer(qinn[None, :])
+        q_cnn_layer = tf.keras.layers.Conv1D(300,
+                                             5,
+                                             activation='tanh',
+                                             input_shape=(None, self.qlen, None),
+                                             trainable=True)
 
-        cemb = tf.keras.layers.Concatenate(axis=-1)([c_char_embedding_layer, word_embedding_layer])
-        qemb = tf.keras.layers.Concatenate(axis=-1)([q_char_embedding_layer, word_embedding_layer])
+        c_char_embedding_layer = c_cnn_layer(cinn[None, :])
+
+        q_char_embedding_layer = q_cnn_layer(qinn[None, :])
+
+        flatten_layer = tf.keras.layers.Flatten()
+        c_x = flatten_layer(c_char_embedding_layer)
+        q_x = flatten_layer(q_char_embedding_layer)
+
+        cemb = tf.keras.layers.Concatenate(axis=-1)([c_x, word_embedding_layer])
+        qemb = tf.keras.layers.Concatenate(axis=-1)([q_x, word_embedding_layer])
 
         for i in range(self.num_highway_layers):
             """
