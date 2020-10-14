@@ -77,13 +77,11 @@ class BiDAF:
         c_cnn_layer = tf.keras.layers.Conv1D(300,
                                              5,
                                              activation='tanh',
-                                             input_shape=(None, self.clen, None),
                                              trainable=True)
 
         q_cnn_layer = tf.keras.layers.Conv1D(300,
                                              5,
                                              activation='tanh',
-                                             input_shape=(None, self.qlen, None),
                                              trainable=True)
 
         c_char_embedding_layer = c_cnn_layer(cinn[None, :])
