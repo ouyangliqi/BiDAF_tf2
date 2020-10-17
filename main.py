@@ -31,11 +31,15 @@ class BiDAF:
 
     def __init__(
             self, clen, qlen, emb_size,
+            max_char_len=16,
             max_features=5000,
+            vocab_size=5000,
             num_highway_layers=2,
             encoder_dropout=0,
             num_decoders=2,
             decoder_dropout=0,
+            conv_layers=[],
+            embedding_matrix=None
     ):
         """
         双向注意流模型
@@ -50,12 +54,15 @@ class BiDAF:
         """
         self.clen = clen
         self.qlen = qlen
+        self.max_char_len = max_char_len
         self.max_features = max_features
         self.emb_size = emb_size
         self.num_highway_layers = num_highway_layers
         self.encoder_dropout = encoder_dropout
         self.num_decoders = num_decoders
         self.decoder_dropout = decoder_dropout
+        self.conv_layers = conv_layers
+        self.embedding_matrix = embedding_matrix
 
     def build_model(self):
         """
@@ -63,37 +70,31 @@ class BiDAF:
         :return:
         """
         # 1 embedding 层
-        # TODO：homework：使用glove word embedding（或自己训练的w2v） 和 CNN char embedding 
-        cinn = tf.keras.layers.Input(shape=(self.clen,), name='context_input')
-        qinn = tf.keras.layers.Input(shape=(self.qlen,), name='question_input')
+        # TODO：homework：使用glove word embedding（或自己训练的w2v） 和 CNN char embedding
+        word_cinn = tf.keras.layers.Input(shape=(self.clen, self.max_char_len), name='word_context_input')
+        word_qinn = tf.keras.layers.Input(shape=(self.qlen, self.max_char_len), name='word_question_input')
 
-        word_embedding_matrix = load_glove(ds, './data/glove.6B.300d.txt')
+        char_cinn = tf.keras.layers.Input(shape=(self.clen, self.max_char_clen,), name='char_context_input')
+        char_qinn = tf.keras.layers.Input(shape=(self.qlen, self.max_char_qlen,), name='char_question_input')
 
         word_embedding_layer = tf.keras.layers.Embedding(self.max_features,
-                                                         300,
-                                                         weights=[word_embedding_matrix],
+                                                         self.emb_size,
+                                                         weights=[self.embedding_matrix],
                                                          trainable=False)
+        w_cemb = word_embedding_layer(word_cinn)
+        w_qemb = word_embedding_layer(word_qinn)
 
-        c_cnn_layer = tf.keras.layers.Conv1D(300,
-                                             5,
-                                             activation='tanh',
-                                             trainable=True)
+        char_embedding_layer = tf.keras.layers.Embedding(self.max_features,
+                                                         self.emb_size,
+                                                         embeddings_initializer='uniform')
+        c_cemb = char_embedding_layer(char_cinn)
+        c_qemb = char_embedding_layer(char_qinn)
 
-        q_cnn_layer = tf.keras.layers.Conv1D(300,
-                                             5,
-                                             activation='tanh',
-                                             trainable=True)
+        c_cemb_c = self.multi_conv1d(c_cemb)
+        c_qemb_c = self.multi_conv1d(c_qemb)
 
-        c_char_embedding_layer = c_cnn_layer(cinn[None, :])
-
-        q_char_embedding_layer = q_cnn_layer(qinn[None, :])
-
-        flatten_layer = tf.keras.layers.Flatten()
-        c_x = flatten_layer(c_char_embedding_layer)
-        q_x = flatten_layer(q_char_embedding_layer)
-
-        cemb = tf.keras.layers.Concatenate(axis=-1)([c_x, word_embedding_layer])
-        qemb = tf.keras.layers.Concatenate(axis=-1)([q_x, word_embedding_layer])
+        cemb = tf.keras.layers.Concatenate(axis=2)([c_cemb_c, w_cemb])
+        qemb = tf.keras.layers.Concatenate(axis=2)([c_qemb_c, w_qemb])
 
         for i in range(self.num_highway_layers):
             """
@@ -156,7 +157,7 @@ class BiDAF:
         output_layer = layers.Combine(name='CombineOutputs')
         out = output_layer([span_begin_prob, span_end_prob])
 
-        inn = [cinn, qinn]
+        inn = [char_cinn, char_qinn, word_cinn, word_qinn]
 
         self.model = tf.keras.models.Model(inn, out)
         self.model.summary(line_length=128)
@@ -167,6 +168,30 @@ class BiDAF:
             loss=negative_avg_log_error,
             metrics=[accuracy]
         )
+
+    def multi_conv1d(self, x_emb):
+        def conv1d(emb, kernel_sizes, max_char_len=self.max_char_len):
+            pool_out = []
+            for kernel_size in kernel_sizes:
+                conv = tf.keras.layers.Conv1D(filters=2, kernel_size=[kernel_size], strides=1,
+                                              activation='relu')(emb)
+                pool = tf.keras.layers.MaxPool1D(pool_size=max_char_len - kernel_size + 1)(conv)
+                pool_out.append(pool)
+
+            pool_out = tf.keras.layers.concatenate([p for p in pool_out])
+            return pool_out
+
+        words_emb = tf.unstack(x_emb, axis=1)
+        vec_list = []
+        for word_emb in words_emb:
+            conv = conv1d(word_emb, [2, 3, 4])
+            vec_list.append(conv)
+
+        char_emb = tf.convert_to_tensor(vec_list)
+        char_emb = tf.transpose(char_emb, perm=[1, 0, 2, 3])
+        char_emb = tf.squeeze(char_emb, axis=2)
+
+        return char_emb
 
 
 def negative_avg_log_error(y_true, y_pred):
@@ -228,28 +253,35 @@ def accuracy(y_true, y_pred):
     return tf.math.reduce_mean(acc, axis=0)
 
 
+
+
+
 if __name__ == '__main__':
     ds = preprocess.Preprocessor([
         './data/squad/train-v1.1.json',
         './data/squad/dev-v1.1.json',
         './data/squad/dev-v1.1.json'
     ])
-    train_c, train_q, train_y = ds.get_dataset('./data/squad/train-v1.1.json')
-    test_c, test_q, test_y = ds.get_dataset('./data/squad/dev-v1.1.json')
+    train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/train-v1.1.json')
+    test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/dev-v1.1.json')
 
-    print(train_c.shape, train_q.shape, train_y.shape)
-    print(test_c.shape, test_q.shape, test_y.shape)
+    print(train_c_char.shape, train_q_char.shape, train_c_word.shape, train_q_word.shape, train_y.shape)
+    print(test_c_char.shape, test_q_char.shape, test_c_word.shape, test_q_word.shape, test_y.shape)
 
     bidaf = BiDAF(
         clen=ds.max_clen,
         qlen=ds.max_qlen,
-        emb_size=300,
-        max_features=len(ds.charset)
+        emb_size=100,
+        max_char_len=ds.max_char_len,
+        max_features=len(ds.charset),
+        vocab_size=len(ds.word_list),
+        conv_layers = [],
+        embedding_matrix=ds.embeddings_matrix()
     )
     bidaf.build_model()
     bidaf.model.fit(
-        [train_c, train_q], train_y,
+        [train_c_char, train_q_char, train_c_word, train_q_word], train_y,
         batch_size=64,
         epochs=10,
-        validation_data=([test_c, test_q], test_y)
+        validation_data=([test_c_char, test_q_char, test_c_word, test_q_word], test_y)
     )

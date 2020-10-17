@@ -12,6 +12,6 @@ def load_glove(preprocesser, glove_filename):
             embedding = split[1:]
             embedding = np.array([float(val) for val in embedding])
             
-            if preprocesser.get_id(word) != '[UNL]':
+            if preprocesser.get_id(word) != '[UNK]':
                 word_to_embedding[preprocesser.get_id(word)] = embedding
     return word_to_embedding
