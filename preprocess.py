@@ -2,8 +2,10 @@ import numpy as np
 import data_io as pio
 import nltk
 
-vocb_path =
-glove_path =
+vocb_path = 'data/vocab.txt'
+glove_path = 'data/glove.6B.300d.txt'
+
+
 class Preprocessor:
     def __init__(self, datasets_fp, max_length=384, stride=128):
         self.datasets_fp = datasets_fp
@@ -32,7 +34,6 @@ class Preprocessor:
 
     def build_wordset(self):
         # all words in vocab
-
         idx = list(range(len(self.word_list)))
         self.w2id = dict(zip(self.word_list, idx))
         self.id2w = dict(zip(idx, self.word_list))
@@ -61,8 +62,8 @@ class Preprocessor:
                         yield qid, context, question, text, answer_start
 
     def char_encode(self, context, question):
-        q_seg_list = self.seg_text(question)
-        c_seg_list = self.seg_text(context)
+        q_seg_list = self.tokenize(question)
+        c_seg_list = self.tokenize(context)
         question_encode = self.convert2id_char(q_seg_list, begin=True, end=True)
         left_length = self.max_length - len(question_encode)
         context_encode = self.convert2id_char(c_seg_list, maxlen=left_length, end=True)
@@ -113,7 +114,7 @@ class Preprocessor:
         word = ['[CLS]'] * begin + word
 
         if maxlen is not None:
-            word = word[:maxlen -1 * end]
+            word = word[:maxlen - 1 * end]
             word += ['[SEP]'] * end
             word += ['[PAD]'] * (maxlen - len(word))
         else:
@@ -155,9 +156,9 @@ class Preprocessor:
             for i, w in enumerate(c_seg_list):
                 if i == 0:
                     continue
-                if b > len_all_char -1 and b <= len_all_char+len(w) -1:
+                if b > len_all_char - 1 and b <= len_all_char + len(w) - 1:
                     b = i + 1
-                if e > len_all_char -1 and e <= len_all_char+len(w) -1:
+                if e > len_all_char - 1 and e <= len_all_char + len(w) - 1:
                     e = i + 1
                 len_all_char += len(w)
 
