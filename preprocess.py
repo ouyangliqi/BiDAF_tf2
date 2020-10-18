@@ -97,28 +97,28 @@ class Preprocessor:
             if max_char_len is not None:
                 ch = ch[:max_char_len]
 
-                ids = list(map(self.get_id_char, ch))
-                while len(ids) < max_char_len:
-                    ids.append(self.get_id_char('[PAD]'))
+            ids = list(map(self.get_id_char, ch))
+            while len(ids) < max_char_len:
+                ids.append(self.get_id_char('[PAD]'))
 
-                char_list.append(np.array(ids))
+            char_list.append(np.array(ids))
 
         if maxlen is not None:
-            char_list = char_list[:maxlen -1*end]
-            char_list += [[self.get_id_char('[PAD]')]*max_char_len]*(maxlen-len(char_list))
+            char_list = char_list[:maxlen - 1 * end]
+            char_list += [[self.get_id_char('[PAD]')] * max_char_len] * (maxlen - len(char_list))
 
         return char_list
 
     def convert2id_word(self, seg_list, maxlen=None, begin=False, end=False):
         word = [word for word in seg_list]
-        word = ['[CLS]'] * begin + word
+        word = ['cls'] * begin + word
 
         if maxlen is not None:
             word = word[:maxlen - 1 * end]
-            word += ['[SEP]'] * end
-            word += ['[PAD]'] * (maxlen - len(word))
+            word += ['sep'] * end
+            word += ['pad'] * (maxlen - len(word))
         else:
-            word += ['[SEP]'] * end
+            word += ['sep'] * end
 
         ids = list(map(self.get_id_word, word))
 
@@ -182,8 +182,8 @@ class Preprocessor:
         return tokens
 
     def load_glove(self, glove_path):
-        with open(glove_path, encoding='utf-8') as f:
-            for line in f:
+        with open(glove_path, encoding='utf-8') as fr:
+            for line in fr:
                 word, coefs = line.split(maxsplit=1)
                 coefs = np.fromstring(coefs, sep=' ')
                 self.embeddings_index[word] = coefs
@@ -193,8 +193,8 @@ class Preprocessor:
 
 if __name__ == '__main__':
     p = Preprocessor([
-        './data/squad/train-v1.1.json',
-        './data/squad/dev-v1.1.json',
+        # './data/squad/train-v1.1.json',
+        # './data/squad/dev-v1.1.json',
         './data/squad/dev-v1.1.json'
     ])
     print(p.char_encode('modern stone statue of Mary', 'To whom did the Virgin Mary '))

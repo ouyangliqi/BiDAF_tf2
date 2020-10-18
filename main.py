@@ -11,7 +11,6 @@ tf.get_logger().setLevel(logging.ERROR)
 import layers
 import preprocess
 import numpy as np
-from data_util import load_glove
 
 print("tf.__version__:", tf.__version__)
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -80,7 +79,7 @@ class BiDAF:
 
         word_embedding_layer = tf.keras.layers.Embedding(self.vocab_size,
                                                          self.emb_size,
-                                                         weights=[self.embedding_matrix],
+                                                         embeddings_initializer=tf.constant_initializer(self.embedding_matrix),
                                                          trainable=False)
         w_cemb = word_embedding_layer(word_cinn)
         w_qemb = word_embedding_layer(word_qinn)
@@ -256,12 +255,16 @@ def accuracy(y_true, y_pred):
 
 if __name__ == '__main__':
     ds = preprocess.Preprocessor([
-        './data/squad/train-v1.1.json',
-        './data/squad/dev-v1.1.json',
+        # './data/squad/train-v1.1.json',
+        # './data/squad/dev-v1.1.json',
         './data/squad/dev-v1.1.json'
     ])
-    train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/train-v1.1.json')
-    test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/dev-v1.1.json')
+    # train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/train-v1.1.json')
+    # test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/dev-v1.1.json')
+
+    train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/test.json')
+
+    test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/test.json')
 
     print(train_c_char.shape, train_q_char.shape, train_c_word.shape, train_q_word.shape, train_y.shape)
     print(test_c_char.shape, test_q_char.shape, test_c_word.shape, test_q_word.shape, test_y.shape)
@@ -269,7 +272,7 @@ if __name__ == '__main__':
     bidaf = BiDAF(
         clen=ds.max_clen,
         qlen=ds.max_qlen,
-        emb_size=100,
+        emb_size=300,
         max_char_len=ds.max_char_len,
         max_features=len(ds.charset),
         vocab_size=len(ds.word_list),
