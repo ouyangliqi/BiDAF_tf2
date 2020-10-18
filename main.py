@@ -259,12 +259,12 @@ if __name__ == '__main__':
         # './data/squad/dev-v1.1.json',
         './data/squad/dev-v1.1.json'
     ])
-    # train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/train-v1.1.json')
-    # test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/dev-v1.1.json')
+    train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/train-v1.1.json')
+    test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/dev-v1.1.json')
 
-    train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/test.json')
+    # train_c_char, train_q_char, train_c_word, train_q_word, train_y = ds.get_dataset('./data/squad/test.json')
 
-    test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/test.json')
+    # test_c_char, test_q_char, test_c_word, test_q_word, test_y = ds.get_dataset('./data/squad/test.json')
 
     print(train_c_char.shape, train_q_char.shape, train_c_word.shape, train_q_word.shape, train_y.shape)
     print(test_c_char.shape, test_q_char.shape, test_c_word.shape, test_q_word.shape, test_y.shape)
@@ -281,8 +281,8 @@ if __name__ == '__main__':
     )
     bidaf.build_model()
     bidaf.model.fit(
-        [train_c_char[0], train_q_char[0], train_c_word[0], train_q_word[0]], train_y[0],
+        [train_c_char, train_q_char, train_c_word, train_q_word], train_y,
         batch_size=64,
         epochs=10,
-        validation_data=([test_c_char[0], test_q_char[0], test_c_word[0], test_q_word[0]], test_y[0])
+        validation_data=([test_c_char, test_q_char, test_c_word, test_q_word], test_y)
     )
