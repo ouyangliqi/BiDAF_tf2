@@ -12,14 +12,15 @@ class Preprocessor:
         self.max_length = max_length
         self.max_clen = 30
         self.max_qlen = 20
-        self.max_char_len = 20
+        self.max_char_len = 5
         self.stride = stride
         self.charset = set()
         self.word_list = []
-        self.build_charset()
-        self.build_wordset()
         self.embeddings_index = {}
         self.embeddings_matrix = []
+        self.load_glove(glove_path)
+        self.build_charset()
+        self.build_wordset()
 
     def build_charset(self):
         for fp in self.datasets_fp:
@@ -64,9 +65,10 @@ class Preprocessor:
     def char_encode(self, context, question):
         q_seg_list = self.tokenize(question)
         c_seg_list = self.tokenize(context)
-        question_encode = self.convert2id_char(q_seg_list, begin=True, end=True)
+        question_encode = self.convert2id_char(q_seg_list, max_char_len=self.max_char_len, maxlen=100, begin=True, end=True)
+        print(np.array(question_encode))
         left_length = self.max_length - len(question_encode)
-        context_encode = self.convert2id_char(c_seg_list, maxlen=left_length, end=True)
+        context_encode = self.convert2id_char(c_seg_list, max_char_len=self.max_char_len, maxlen=left_length, end=True)
         cq_encode = question_encode + context_encode
 
         assert len(cq_encode) == self.max_length
@@ -88,24 +90,22 @@ class Preprocessor:
     def convert2id_char(self, seg_list, max_char_len=None, maxlen=None, begin=False, end=False):
         # TODO： 更改为word_seg里的char
         char_list = []
-        # char_list = [[self.get_id_char('[CLS]')] + [self.get_id_char('[PAD]')] * (max_char_len-1)] * begin + char_list
+        char_list = [[self.get_id_char('[CLS]')] + [self.get_id_char('[PAD]')] * (max_char_len-1)] * begin + char_list
         for word in seg_list:
             ch = [ch for ch in word]
-            ch = ['[CLS]'] * begin + ch
+            # ch = ['[CLS]'] * begin + ch
             if max_char_len is not None:
                 ch = ch[:max_char_len]
 
-            if maxlen is not None:
-                ch = ch[:maxlen - 1 * end]
-                ch += ['[SEP]'] * end
-                ch += ['[PAD]'] * (maxlen - len(ch))
-            else:
-                ch += ['[SEP]'] * end
+                ids = list(map(self.get_id_char, ch))
+                while len(ids) < max_char_len:
+                    ids.append(self.get_id_char('[PAD]'))
 
-            ids = list(map(self.get_id_char, ch))
-            # while len(ids) < max_char_len:
-            #     ids.append(self.get_id_char('[PAD]'))
-            char_list.append(np.array(ids))
+                char_list.append(np.array(ids))
+
+        if maxlen is not None:
+            char_list = char_list[:maxlen -1*end]
+            char_list += [[self.get_id_char('[PAD]')]*max_char_len]*(maxlen-len(char_list))
 
         return char_list
 
@@ -128,10 +128,10 @@ class Preprocessor:
         return self.ch2id.get(ch, self.ch2id['[UNK]'])
 
     def get_id_word(self, word):
-        return self.w2id.get(word, self.w2id['[UNK]'])
+        return self.w2id.get(word, self.w2id['unk'])
 
     def get_dataset(self, ds_fp):
-        ccs, qcs, cws, qws, be = [], [], []
+        ccs, qcs, cws, qws, be = [], [], [], [], []
         for _, cc, qc, cw, qw, b, e in self.get_data(ds_fp):
             ccs.append(cc)
             qcs.append(qc)
@@ -188,7 +188,7 @@ class Preprocessor:
                 coefs = np.fromstring(coefs, sep=' ')
                 self.embeddings_index[word] = coefs
                 self.word_list.append(word)
-                self.embedding_matrix.append(coefs)
+                self.embeddings_matrix.append(coefs)
 
 
 if __name__ == '__main__':
@@ -198,3 +198,4 @@ if __name__ == '__main__':
         './data/squad/dev-v1.1.json'
     ])
     print(p.char_encode('modern stone statue of Mary', 'To whom did the Virgin Mary '))
+    print(p.word_encode('modern stone statue of Mary', 'To whom did the Virgin Mary '))

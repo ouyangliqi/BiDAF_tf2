@@ -57,6 +57,7 @@ class BiDAF:
         self.max_char_len = max_char_len
         self.max_features = max_features
         self.emb_size = emb_size
+        self.vocab_size = vocab_size
         self.num_highway_layers = num_highway_layers
         self.encoder_dropout = encoder_dropout
         self.num_decoders = num_decoders
@@ -71,13 +72,13 @@ class BiDAF:
         """
         # 1 embedding 层
         # TODO：homework：使用glove word embedding（或自己训练的w2v） 和 CNN char embedding
-        word_cinn = tf.keras.layers.Input(shape=(self.clen, self.max_char_len), name='word_context_input')
-        word_qinn = tf.keras.layers.Input(shape=(self.qlen, self.max_char_len), name='word_question_input')
+        word_cinn = tf.keras.layers.Input(shape=(self.clen, ), name='word_context_input')
+        word_qinn = tf.keras.layers.Input(shape=(self.qlen, ), name='word_question_input')
 
-        char_cinn = tf.keras.layers.Input(shape=(self.clen, self.max_char_clen,), name='char_context_input')
-        char_qinn = tf.keras.layers.Input(shape=(self.qlen, self.max_char_qlen,), name='char_question_input')
+        char_cinn = tf.keras.layers.Input(shape=(self.clen, self.max_char_len,), name='char_context_input')
+        char_qinn = tf.keras.layers.Input(shape=(self.qlen, self.max_char_len,), name='char_question_input')
 
-        word_embedding_layer = tf.keras.layers.Embedding(self.max_features,
+        word_embedding_layer = tf.keras.layers.Embedding(self.vocab_size,
                                                          self.emb_size,
                                                          weights=[self.embedding_matrix],
                                                          trainable=False)
@@ -253,9 +254,6 @@ def accuracy(y_true, y_pred):
     return tf.math.reduce_mean(acc, axis=0)
 
 
-
-
-
 if __name__ == '__main__':
     ds = preprocess.Preprocessor([
         './data/squad/train-v1.1.json',
@@ -275,13 +273,13 @@ if __name__ == '__main__':
         max_char_len=ds.max_char_len,
         max_features=len(ds.charset),
         vocab_size=len(ds.word_list),
-        conv_layers = [],
-        embedding_matrix=ds.embeddings_matrix()
+        conv_layers=[2, 3, 4],
+        embedding_matrix=ds.embeddings_matrix
     )
     bidaf.build_model()
     bidaf.model.fit(
-        [train_c_char, train_q_char, train_c_word, train_q_word], train_y,
+        [train_c_char[0], train_q_char[0], train_c_word[0], train_q_word[0]], train_y[0],
         batch_size=64,
         epochs=10,
-        validation_data=([test_c_char, test_q_char, test_c_word, test_q_word], test_y)
+        validation_data=([test_c_char[0], test_q_char[0], test_c_word[0], test_q_word[0]], test_y[0])
     )
