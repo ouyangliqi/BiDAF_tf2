@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 class Highway(tf.keras.layers.Layer):
 
     def __init__(self, activation='relu', *args, **kwargs):

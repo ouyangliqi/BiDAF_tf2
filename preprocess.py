@@ -1,6 +1,8 @@
 import numpy as np
 import data_io as pio
 import nltk
+from bert_serving.client import BertClient
+bc = BertClient(ip='ess76.wisers.com', port=16995, port_out=16996)
 
 vocb_path = 'data/vocab.txt'
 glove_path = 'data/glove.6B.300d.txt'
@@ -11,16 +13,16 @@ class Preprocessor:
         self.datasets_fp = datasets_fp
         self.max_length = max_length
         self.max_clen = 30
-        self.max_qlen = 20
+        self.max_qlen = 30
         self.max_char_len = 5
         self.stride = stride
         self.charset = set()
         self.word_list = []
         self.embeddings_index = {}
         self.embeddings_matrix = []
-        self.load_glove(glove_path)
-        self.build_charset()
-        self.build_wordset()
+        # self.load_glove(glove_path)
+        # self.build_charset()
+        # self.build_wordset()
 
     def build_charset(self):
         for fp in self.datasets_fp:
@@ -88,7 +90,6 @@ class Preprocessor:
         return cq_encode
 
     def convert2id_char(self, seg_list, max_char_len=None, maxlen=None, begin=False, end=False):
-        # TODO： 更改为word_seg里的char
         char_list = []
         char_list = [[self.get_id_char('[CLS]')] + [self.get_id_char('[PAD]')] * (max_char_len-1)] * begin + char_list
         for word in seg_list:
@@ -189,6 +190,24 @@ class Preprocessor:
                 self.embeddings_index[word] = coefs
                 self.word_list.append(word)
                 self.embeddings_matrix.append(coefs)
+
+    def bert_encode(self, ds_fp):
+        cs, qs, be = [], [], []
+        dataset = pio.load(ds_fp)
+        for qid, context, question, text, answer_start in self.iter_cqa(dataset):
+            c_seg_list = self.tokenize(context)
+            q_seg_list = self.tokenize(question)
+            while len(c_seg_list) < self.max_clen:
+                c_seg_list += ['[PAD]']
+            while len(q_seg_list) < self.max_qlen:
+                q_seg_list += ['[PAD]']
+            cc = bc.encode(c_seg_list[:self.max_clen])
+            qc = bc.encode(q_seg_list[:self.max_qlen])
+            b, e = answer_start, answer_start + len(text)
+            cs.append(cc)
+            qs.append(qc)
+            be.append((b, e))
+        return map(np.array, (cs, qs, be))
 
 
 if __name__ == '__main__':
