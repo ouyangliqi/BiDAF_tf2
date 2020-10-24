@@ -12,8 +12,8 @@ class Preprocessor:
     def __init__(self, datasets_fp, max_length=384, stride=128):
         self.datasets_fp = datasets_fp
         self.max_length = max_length
-        self.max_clen = 30
-        self.max_qlen = 30
+        self.max_clen = 25
+        self.max_qlen = 25
         self.max_char_len = 5
         self.stride = stride
         self.charset = set()
@@ -195,14 +195,8 @@ class Preprocessor:
         cs, qs, be = [], [], []
         dataset = pio.load(ds_fp)
         for qid, context, question, text, answer_start in self.iter_cqa(dataset):
-            c_seg_list = self.tokenize(context)
-            q_seg_list = self.tokenize(question)
-            while len(c_seg_list) < self.max_clen:
-                c_seg_list += ['[PAD]']
-            while len(q_seg_list) < self.max_qlen:
-                q_seg_list += ['[PAD]']
-            cc = bc.encode(c_seg_list[:self.max_clen])
-            qc = bc.encode(q_seg_list[:self.max_qlen])
+            cc = bc.encode([context[:self.max_clen]])[0]  # max_seq, emb_size
+            qc = bc.encode([question[:self.max_qlen]])[0]  # max_seq, emb_size
             b, e = answer_start, answer_start + len(text)
             cs.append(cc)
             qs.append(qc)

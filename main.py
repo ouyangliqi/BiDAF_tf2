@@ -71,48 +71,8 @@ class BiDAF:
         :return:
         """
         # 1 embedding 层
-        if self.bertembedding:
-            cinn = tf.keras.layers.Input(shape=(self.clen, 768), name='word_context_input')
-            qinn = tf.keras.layers.Input(shape=(self.qlen, 768), name='word_question_input')
-
-            cemb = cinn
-            qemb = qinn
-        else:
-            word_cinn = tf.keras.layers.Input(shape=(self.clen,), name='word_context_input')
-            word_qinn = tf.keras.layers.Input(shape=(self.qlen,), name='word_question_input')
-
-            char_cinn = tf.keras.layers.Input(shape=(self.clen, self.max_char_len,), name='char_context_input')
-            char_qinn = tf.keras.layers.Input(shape=(self.qlen, self.max_char_len,), name='char_question_input')
-
-            word_embedding_layer = tf.keras.layers.Embedding(self.vocab_size,
-                                                             self.emb_size,
-                                                             embeddings_initializer=tf.constant_initializer(
-                                                                 self.embedding_matrix),
-                                                             trainable=False)
-            w_cemb = word_embedding_layer(word_cinn)
-            w_qemb = word_embedding_layer(word_qinn)
-
-            char_embedding_layer = tf.keras.layers.Embedding(self.max_features,
-                                                             self.emb_size,
-                                                             embeddings_initializer='uniform')
-            c_cemb = char_embedding_layer(char_cinn)
-            c_qemb = char_embedding_layer(char_qinn)
-
-            c_cemb_c = self.multi_conv1d(c_cemb)
-            c_qemb_c = self.multi_conv1d(c_qemb)
-
-            cemb = tf.keras.layers.Concatenate(axis=2)([c_cemb_c, w_cemb])
-            qemb = tf.keras.layers.Concatenate(axis=2)([c_qemb_c, w_qemb])
-
-            for i in range(self.num_highway_layers):
-                """
-                使用两层高速神经网络
-                """
-                highway_layer = layers.Highway(name=f'Highway{i}')
-                chighway = tf.keras.layers.TimeDistributed(highway_layer, name=f'CHighway{i}')
-                qhighway = tf.keras.layers.TimeDistributed(highway_layer, name=f'QHighway{i}')
-                cemb = chighway(cemb)
-                qemb = qhighway(qemb)
+        cemb = tf.keras.layers.Input(shape=(self.clen, 768), name='word_context_input')
+        qemb = tf.keras.layers.Input(shape=(self.qlen, 768), name='word_question_input')
 
         ## 2. 上下文嵌入层
         # 编码器 双向LSTM
@@ -165,10 +125,7 @@ class BiDAF:
         output_layer = layers.Combine(name='CombineOutputs')
         out = output_layer([span_begin_prob, span_end_prob])
 
-        if self.bertembedding:
-            inn = [cinn, qinn]
-        else:
-            inn = [char_cinn, char_qinn, word_cinn, word_qinn]
+        inn = [cemb, qemb]
 
         self.model = tf.keras.models.Model(inn, out)
         self.model.summary(line_length=128)
@@ -293,14 +250,13 @@ if __name__ == '__main__':
         max_char_len=ds.max_char_len,
         max_features=len(ds.charset),
         vocab_size=len(ds.word_list),
-        conv_layers=[2, 3, 4],
-        embedding_matrix=ds.embeddings_matrix,
-        bertembedding=True
+        bertembedding=False
     )
     bidaf.build_model()
     bidaf.model.fit(
-        [train_c, train_q], train_y,
-        batch_size=64,
+        [train_c, train_q],
+        train_y,
+        batch_size=32,
         epochs=10,
         validation_data=([test_c, test_q], test_y)
     )
